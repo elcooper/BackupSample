@@ -1,0 +1,136 @@
+{
+    "$schema": "http://schemas.microsoft.org/azure/deploymentTemplate?api-version=2015-01-01#",
+    "contentVersion": "1.0",
+    "parameters": {
+        "accountName": {
+            "type": "string",
+            "defaultValue": "BackupAutomationAccount",
+            "metadata": {
+                "description": "The name of the Automation account to use."
+            }
+        },
+        "location": {
+            "type": "string",
+            "allowedValues": [
+                "Japan East",
+                "East US 2",
+                "West Europe",
+                "Southeast Asia",
+                "South Central US"
+            ],
+            "defaultValue": "East US 2",
+            "metadata": {
+                "description": "The region to deploy the Automation account in."
+            }
+        },
+        "scheduleName": {
+            "type": "string",
+            "defaultValue": "DailyVmBackupSchedule",
+            "metadata": {
+                "description": "The name of the schedule."
+            }
+        },
+        "GUID (use https://www.guidgenerator.com/ to generate)": {
+            "type": "string",
+            "metadata": {
+                "description": "This guid is used to start a runbook job that schedules the backup runbook.  Use https://www.guidgenerator.com/ or New-GUID in PowerShell to generate a GUID and copy here.  "
+            }
+        }
+    },
+    "variables": {
+        "pricingTier": "Free",
+        "runbookPublishedName": "AutoBackupVM",
+        "runbookPublishedURI": "https://bethstorageacct.blob.core.windows.net/bethcontainer/AutoBackupVM.ps1",
+        "scheduleRunbookName": "Create-Schedule",
+        "scheduleRunbookURI":  "https://bethstorageacct.blob.core.windows.net/bethcontainer/Create-Schedule.ps1"
+    },
+        "resources": [
+            {
+                "name": "[parameters('accountName')]",
+                "type": "Microsoft.Automation/automationAccounts",
+                "apiVersion": "2015-01-01-preview",
+                "location": "[parameters('location')]",
+                "dependsOn": [
+                ],
+                "tags": {
+                    "key": "value"
+                },
+                "properties": {
+                    "comment": "",
+                    "sku": {
+                        "name": "[variables('pricingTier')]"
+                    }
+                },
+                "resources": [
+                    {
+                        "name": "[variables('runbookPublishedName')]",
+                        "type": "runbooks",
+                        "apiVersion": "2015-01-01-preview",
+                        "location": "[parameters('location')]",
+                        "dependsOn": [
+                            "[concat('Microsoft.Automation/automationAccounts/', parameters('accountName'))]"
+                        ],
+                        "tags": {
+                        },
+                        "properties": {
+                            "runbookType": "PowerShell",
+                            "logProgress": "false",
+                            "logVerbose": "false",
+                            "description": "This runbook backs up your Virtual Machines.",
+                            "publishContentLink": {
+                                "uri": "[variables('runbookPublishedURI')]",
+                                "version": "1.0.0.0"
+                            }
+                        }
+                    },
+                    {
+                        "name": "[variables('scheduleRunbookName')]",
+                        "type": "runbooks",
+                        "apiVersion": "2015-01-01-preview",
+                        "location": "[parameters('location')]",
+                        "dependsOn": [
+                            "[concat('Microsoft.Automation/automationAccounts/', parameters('accountName'))]"
+                        ],
+                        "tags": {
+                        },
+                        "properties": {
+                            "runbookType": "PowerShell",
+                            "logProgress": "false",
+                            "logVerbose": "false",
+                            "description": "",
+                            "publishContentLink": {
+                                "uri": "[variables('scheduleRunbookURI')]",
+                                "version": "1.0.0.0"
+                            }
+                        }
+                    },
+                    {
+                    "name": "[parameters('GUID (use https://www.guidgenerator.com/ to generate)')]",
+                    "type": "jobs",
+                    "apiVersion": "2015-01-01-preview",
+                    "location": "[parameters('location')]",
+                    "dependsOn": [
+                        "[concat('Microsoft.Automation/automationAccounts/', parameters('accountName'))]",
+                        "[concat('Microsoft.Automation/automationAccounts/', parameters('accountName'), '/runbooks/', variables('scheduleRunbookName'))]",
+                        "[concat('Microsoft.Automation/automationAccounts/', parameters('accountName'), '/runbooks/', variables('runbookPublishedName'))]"
+                    ],
+                    "tags": {},
+                    "properties": {
+                        "runbook": {
+                            "name": "[variables('scheduleRunbookName')]"
+                        },
+                        "parameters": {
+                            "ResourceGroup": "resourceGroup().Name",
+                            "AutomationAccount": "[parameters('accountName')]",
+                            "RunbookToSchedule": "[variables('runbookPublishedName')]"
+                        }
+                    }
+                }
+
+                ]
+            }
+        ],
+
+        "outputs": {
+        }
+    }
